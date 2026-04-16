@@ -1,0 +1,31 @@
+{
+    "name": "instagram-automation",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "start": "node dist/index.js",
+        "build": "tsc",
+        "test": "vitest",
+        "test:run": "vitest run"
+    },
+    "keywords": [],
+    "author": "wreccy",
+    "license": "ISC",
+    "type": "module",
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.89.0",
+        "dotenv": "^17.4.2",
+        "ky": "^2.0.1",
+        "pino": "^10.3.1",
+        "zod": "^4.3.6"
+    },
+    "devDependencies": {
+        "@types/node": "^25.6.0",
+        "pino-pretty": "^13.1.3",
+        "tsx": "^4.21.0",
+        "typescript": "^6.0.2",
+        "vitest": "^4.1.4"
+    }
+}
