@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { MessageParam } from '@anthropic-ai/sdk/dist/types'
 import { env } from '../config/env.js'
 import { logger } from './logger.js'
 import { withRetry } from './retry.js'
@@ -15,24 +16,47 @@ export const CLAUDE_MODELS = {
 
 export type ClaudeModel = typeof CLAUDE_MODELS[keyof typeof CLAUDE_MODELS]
 
+export type ConservationMessage = MessageParam
+
+export interface ConservationHistory {
+    messages: ConservationMessage[]
+}
+
 interface GenerateOptions {
     system: string
     prompt: string
+    history?: ConservationHistory
     model?: ClaudeModel
     temperature?: number
     maxTokens?: number
+}
+
+export function appendMessage(
+    history: ConservationHistory,
+    role: 'user' | 'assistant',
+    content: string  
+): ConservationHistory {
+    return {
+        messages: [...history.messages, { role, content }],
+    }
 }
 
 export async function generate(options: GenerateOptions): Promise<string> {
     const {
         system,
         prompt,
+        history,
         model = CLAUDE_MODELS.SONNET,
         temperature = 0.7,
         maxTokens = 1024,
     } = options
 
     logger.debug({ model, temperature }, 'Calling Claude API')
+    
+    const messages: ConservationMessage[] = [
+        ...(history?.messages ?? []),
+        { role: 'user', content: prompt }
+    ]
 
     const response = await withRetry(
         () => anthropic.messages.create({
@@ -40,9 +64,7 @@ export async function generate(options: GenerateOptions): Promise<string> {
             max_tokens: maxTokens,
             temperature,
             system,
-            messages: [
-                { role: 'user', content: prompt }
-            ],
+            messages,
         }),
         { maxAttempts: 3, baseDelayMs: 2000 }
     )
