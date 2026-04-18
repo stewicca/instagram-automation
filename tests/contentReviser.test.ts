@@ -35,24 +35,24 @@ const REVISED_CONTENT: ContentOutput = {
 describe('reviseContent', () => {
     it('revises content base on feedback', async () => {
         mockGenerate.mockResolvedValueOnce(JSON.stringify(REVISED_CONTENT))
-        
+
         const session = createRevisionSession(MOCK_CONTENT)
         const { content, session: updatedSession } = await reviseContent(
             session,
             'Caption terlalu formal, buat lebih casual dan friendly'
         )
-        
+
         expect(content.caption).toBe(REVISED_CONTENT.caption)
         expect(updatedSession.history.messages).toHaveLength(4)
         expect(updatedSession.revisionCount).toBe(1)
     })
-    
+
     it('throws after max revisions', async () => {
         const session = {
             ...createRevisionSession(MOCK_CONTENT),
             revisionCount: 5,
         }
-        
+
         await expect(
             reviseContent(session, 'feedback apapun')
         ).rejects.toThrow('Maximum revisions')
