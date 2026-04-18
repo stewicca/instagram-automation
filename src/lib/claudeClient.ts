@@ -31,6 +31,8 @@ interface GenerateOptions {
     maxTokens?: number
 }
 
+type StreamCallback = (chunk: string) => void
+
 export function appendMessage(
     history: ConservationHistory,
     role: 'user' | 'assistant',
@@ -83,4 +85,36 @@ export async function generate(options: GenerateOptions): Promise<string> {
     }, 'Claude API response received')
 
     return content.text
+}
+
+export async function generateStream(
+    options: Omit<GenerateOptions, 'history'>,
+    onChunk: StreamCallback
+): Promise<string> {
+    const {
+        system,
+        prompt,
+        model = CLAUDE_MODELS.SONNET,
+        temperature = 0.7,
+        maxToken = 1024,
+    } = options
+
+    let fullText = ''
+
+    const stream = anthropic.messages.stream({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        system,
+        messages: [{ role: 'user', content: prompt }],
+    })
+
+    stream.on('text', (chunk) => {
+        fullText += chunk
+        onChunk(chunk)
+    })
+
+    await stream.finalMessage()
+
+    return fullText
 }
