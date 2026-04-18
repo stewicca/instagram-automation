@@ -3,7 +3,7 @@
         "target": "ES2022",
         "module": "NodeNext",
         "moduleResolution": "NodeNext",
-        "ourDir": "./dist",
+        "outDir": "./dist",
         "rootDir": "./src",
         "strict": true,
         "exactOptionalPropertyTypes": true,

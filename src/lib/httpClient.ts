@@ -1,5 +1,5 @@
 import ky, { type Options, HTTPError } from 'ky'
-import { logger } from './logger.ts'
+import { logger } from './logger.js'
 import { withRetry, type RetryOptions } from './retry.js'
 
 const DEFAULT_OPTIONS: Options = {
