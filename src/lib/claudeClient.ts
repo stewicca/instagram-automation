@@ -3,6 +3,7 @@ import { MessageParam } from '@anthropic-ai/sdk/dist/types'
 import { env } from '../config/env.js'
 import { logger } from './logger.js'
 import { withRetry } from './retry.js'
+import { trackUsage } from './costTracker.js'
 
 export const anthropic = new Anthropic({
     apiKey: env.ANTHROPIC_API_KEY,
@@ -36,7 +37,7 @@ type StreamCallback = (chunk: string) => void
 export function appendMessage(
     history: ConservationHistory,
     role: 'user' | 'assistant',
-    content: string  
+    content: string
 ): ConservationHistory {
     return {
         messages: [...history.messages, { role, content }],
@@ -54,7 +55,7 @@ export async function generate(options: GenerateOptions): Promise<string> {
     } = options
 
     logger.debug({ model, temperature }, 'Calling Claude API')
-    
+
     const messages: ConservationMessage[] = [
         ...(history?.messages ?? []),
         { role: 'user', content: prompt }
@@ -83,6 +84,12 @@ export async function generate(options: GenerateOptions): Promise<string> {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
     }, 'Claude API response received')
+
+    trackUsage({
+        model,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+    })
 
     return content.text
 }
