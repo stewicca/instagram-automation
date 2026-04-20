@@ -36,6 +36,10 @@ export async function fetchWithRetry<T>(
                 throw error
             }
         },
-        { maxAttempts, baseDelayMs, shouldRetry }
+        {
+            ...(maxAttempts !== undefined && { maxAttempts }),
+            ...(baseDelayMs !== undefined && { baseDelayMs }),
+            ...(shouldRetry !== undefined && { shouldRetry }),
+        }
     )
 }

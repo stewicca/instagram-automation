@@ -10,7 +10,7 @@ import { BRAND_VOICE_SYSTEM_PROMPT } from './prompts/brandVoice.js'
 import { ContentOutputSchema, type ContentOutput } from './contentGenerator.js'
 
 export interface RevisionSession {
-    originalContent: string
+    originalContent: ContentOutput
     history: ConservationHistory
     revisionCount: number
 }

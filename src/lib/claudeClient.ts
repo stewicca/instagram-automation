@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { MessageParam } from '@anthropic-ai/sdk/dist/types'
 import { env } from '../config/env.js'
 import { logger } from './logger.js'
 import { withRetry } from './retry.js'
@@ -14,6 +13,8 @@ export const CLAUDE_MODELS = {
     SONNET: 'claude-sonnet-4-6',
     HAIKU: 'claude-haiku-4-5-20251001',
 } as const
+
+type MessageParam = Anthropic.Messages.MessageParam
 
 export type ClaudeModel = typeof CLAUDE_MODELS[keyof typeof CLAUDE_MODELS]
 
@@ -103,7 +104,7 @@ export async function generateStream(
         prompt,
         model = CLAUDE_MODELS.SONNET,
         temperature = 0.7,
-        maxToken = 1024,
+        maxTokens = 1024,
     } = options
 
     let fullText = ''
