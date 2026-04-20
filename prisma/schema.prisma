@@ -1,0 +1,111 @@
+generator client {
+    provider = "prisma-client"
+    output   = "../src/generated/prisma"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum ContentStatus {
+    PENDING_REVIEW
+    APPROVED
+    REJECTED
+    SCHEDULED
+    PUBLISHED
+    FAILED
+}
+
+enum ContentPillar {
+    EDUCATIONAL
+    PROMOTIONAL
+    LIFESTYLE
+    ENGAGEMENT
+    BEHIND_THE_SCENES
+}
+
+model ContentDraft {
+    id              String          @id @default(cuid())
+    status          ContentStatus   @default(PENDING_REVIEW)
+    
+    caption         String
+    hashtags        String[]
+    imagePrompt     String
+    imageUrl        String?
+    contentPillar   ContentPillar
+    bestPostTime    String?
+    
+    feedback        String?
+    
+    scheduledAt     DateTime?
+    
+    instagramPostId String?
+    
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
+    publishedAt     DateTime?
+    
+    analytics       PostAnalytics?
+    
+    @@index([status])
+    @@index([scheduledAt])
+}
+
+model PostAnalytics {
+    id              String          @id @default(cuid())
+    
+    contentDraft    ContentDraft    @relation(fields: [contentDraftId], references: [id])
+    contentDraftId  String          @unique
+    
+    instagramPostId String
+    
+    reach           Int             @default(0)
+    impressions     Int             @default(0)
+    likes           Int             @default(0)
+    comments        Int             @default(0)
+    saves           Int             @default(0)
+    shares          Int             @default(0)
+    engagementRate  Float           @default(0)
+    
+    boosted         Boolean         @default(false)
+    adsCampaignId   String?
+    
+    fetchedAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
+    
+    @@index([instagramPostId])
+    @@index([engagementRate])
+}
+
+model RejectionFeedback {
+    id              String          @id @default(cuid())
+    
+    contentDraftId  String
+    
+    caption         String
+    imagePrompt     String
+    feedback        String
+    
+    usedAsExample   Boolean         @default(false)
+    
+    createdAt       DateTime        @default(now())
+    
+    @@index([usedAsExample])
+}
+
+model JobLog {
+    id              String          @id @default(cuid())
+    jobName         String
+    jobId           String
+    status          String
+    payload         Json?
+    result          Json?
+    error           String?
+    duration        Int?
+    
+    createdAt       DateTime        @default(now())
+    
+    @@index([jobName])
+    @@index([status])
+    @@index([createdAt])
+}
