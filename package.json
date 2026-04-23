@@ -10,7 +10,9 @@
         "typecheck": "tsc --noEmit",
         "typecheck:test": "tsc -p tsconfig.test.json",
         "test": "vitest",
-        "test:run": "vitest run"
+        "test:run": "vitest run",
+        "migrate": "prisma migrate dev",
+        "migrate:test": "NODE_ENV=test prisma migrate deploy"
     },
     "keywords": [],
     "author": "wreccy",

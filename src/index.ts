@@ -1,72 +1,51 @@
 import { logger } from './lib/logger.js'
-import { InstagramClient } from './instagram/client.js'
-import { generateContent } from './agents/contentGenerator.js'
-import { createRevisionSession, reviseContent } from './agents/contentReviser.js'
-import { getDailyCost } from './lib/costTracker.js'
+import { redisConnection, queues } from './lib/queue.js'
+import { db } from './lib/db.js'
+import { createGenerateContentWorker } from './jobs/generateContent.job.js'
+import { createPublishPostWorker } from './jobs/publishPost.job.js'
+import { setupScheduledJobs } from './jobs/scheduler.js'
 
 async function main() {
-    logger.info('Instagram Automation - starting up')
+    logger.info('Instagram Automation — starting up')
 
-    const client = new InstagramClient()
+    const workers = [
+        createGenerateContentWorker(),
+        createPublishPostWorker(),
+    ]
 
-    logger.info('Fetching profile...')
-    const [profile, recentMedia] = await Promise.allSettled([
-        client.getProfile(),
-        client.getRecentMedia(10),
-    ])
+    await setupScheduledJobs()
 
-    if (profile.status === 'fulfilled') {
-        logger.info({
-            username: profile.value.username,
-            followers: profile.value.followers_count,
-            totalPosts: profile.value.media_count,
-        }, 'Profile fetched')
-    } else {
-        logger.warn({ error: profile.reason }, 'Could not fetch profile — continuing')
+    logger.info(`${workers.length} workers started, system is running`)
+
+    let isShuttingDown = false
+
+    async function shutdown(signal: string): Promise<void> {
+        if (isShuttingDown) return
+        isShuttingDown = true
+
+        logger.info({ signal }, 'Shutdown signal received — draining workers')
+
+        await Promise.all(workers.map((w) => w.close()))
+        logger.info('All workers drained')
+
+        await Promise.all(Object.values(queues).map((q) => q.close()))
+        logger.info('All queues closed')
+
+        await redisConnection.quit()
+        logger.info('Redis connection closed')
+
+        await db.$disconnect()
+        logger.info('Database connection closed')
+
+        logger.info('Shutdown complete')
+        process.exit(0)
     }
 
-    if (recentMedia.status === 'fulfilled') {
-        logger.info({
-            fetchedCount: recentMedia.value.data.length,
-            types: recentMedia.value.data.map(m => m.media_type),
-        }, 'Recent media fetched')
-    } else {
-        logger.warn('Could not fetch recent media — continuing')
-    }
-
-    logger.info('Generating content...')
-    const content = await generateContent({
-    		topic: 'Kemeja batik modern untuk meeting',
-     		productType: 'Kemeja pria',
-        currentMoment: 'Back to office season',
-    })
-
-    logger.info({
-        contentPillar: content.contentPillar,
-        captionLength: content.caption.length,
-        hashtagCount: content.hashtags.length,
-        bestTime: content.bestPostingTime,
-    }, 'Content generated')
-
-    logger.info('Simulating revision flow...')
-    let session = createRevisionSession(content)
-
-    const { content: revised } = await reviseContent(
-        session,
-        'Caption terlalu formal — buat lebih casual dan tambahkan referensi ke kenyamanan bahan'
-    )
-
-    logger.info({
-        originalCaption: content.caption.slice(0, 50) + '...',
-        revisedCaption: revised.caption.slice(0, 50) + '...',
-    }, 'Revision complete')
-
-    logger.info({
-        dailyCostUsd: getDailyCost().toFixed(6),
-    }, 'Session complete')
+    process.on('SIGTERM', () => void shutdown('SIGTERM'))
+    process.on('SIGINT', () => void shutdown('SIGINT'))
 }
 
-main().catch(err => {
-    logger.error({ err }, 'Fatal error'),
+main().catch((err) => {
+    logger.fatal({ err }, 'Fatal error during startup')
     process.exit(1)
 })
