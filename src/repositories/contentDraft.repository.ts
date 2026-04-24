@@ -57,12 +57,12 @@ export const contentDraftRepository = {
             const draft = await tx.contentDraft.findUniqueOrThrow({
                 where: { id },
             })
-          
+
             const updated = await tx.contentDraft.update({
                 where: { id },
                 data: { status: ContentStatus.REJECTED, feedback },
             })
-          
+
             await tx.rejectionFeedback.create({
                 data: {
                     contentDraftId: id,
@@ -71,7 +71,7 @@ export const contentDraftRepository = {
                     feedback,
                 },
             })
-          
+
             logger.info({ draftId: id, feedback }, 'Content draft rejected with feedback')
             return updated
         })
