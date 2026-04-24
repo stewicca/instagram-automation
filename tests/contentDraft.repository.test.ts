@@ -1,7 +1,25 @@
-import { describe, it, expect } from 'vitest'
-import { testDb } from './setup.js'
-import { contentDraftRepository } from '../src/repositories/contentDraft.repository.js'
+import { describe, it, expect, vi } from 'vitest'
 import { ContentStatus, ContentPillar } from '../src/generated/prisma/enums.js'
+
+const { testDb } = await vi.hoisted(async () => {
+    const { PrismaPg } = await import('@prisma/adapter-pg')
+    const { PrismaClient } = await import('../src/generated/prisma/client.js')
+
+    const adapter = new PrismaPg({
+        connectionString: process.env['DATABASE_URL_TEST'],
+    })
+
+    const testDb = new PrismaClient({ adapter })
+    return { testDb }
+})
+
+vi.mock('../src/lib/db.js', () => ({
+    db: testDb,
+}))
+
+const { contentDraftRepository } = await import(
+    '../src/repositories/contentDraft.repository.js'
+)
 
 const MOCK_DRAFT_INPUT = {
     caption: 'Kemeja batik modern untuk meeting — elegan tanpa batas. 🌿',
@@ -12,7 +30,6 @@ const MOCK_DRAFT_INPUT = {
 }
 
 describe('contentDraftRepository', () => {
-
     describe('create', () => {
         it('menyimpan draft baru dengan status PENDING_REVIEW', async () => {
             const draft = await contentDraftRepository.create(MOCK_DRAFT_INPUT)

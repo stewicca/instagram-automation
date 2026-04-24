@@ -10,8 +10,8 @@ export const testDb = new PrismaClient({ adapter })
 
 beforeEach(async () => {
     await testDb.postAnalytics.deleteMany()
-    await testDb.contentDraft.deleteMany()
     await testDb.rejectionFeedback.deleteMany()
+    await testDb.contentDraft.deleteMany()
     await testDb.jobLog.deleteMany()
 })
 
