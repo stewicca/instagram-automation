@@ -79,7 +79,8 @@ export async function generateContent(
         model: aiModel,
         system: BRAND_VOICE_SYSTEM_PROMPT,
         prompt: buildPrompt(request) + `
-            Return ONLY a valid JSON object dengan struktur berikut, tanpa penjelasan apapun:
+
+        		Return ONLY a valid JSON object dengan struktur berikut, tanpa penjelasan apapun:
             {
                 "caption": "teks caption max 150 kata",
                 "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4", "#hashtag5"],

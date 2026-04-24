@@ -1,0 +1,83 @@
+import { generateText, Output } from 'ai'
+import { z } from 'zod'
+import { aiModel } from '../../config/aiModel.js'
+import { logger } from '../../lib/logger.js'
+import { env } from '../../config/env.js'
+import type { ContentPlan } from './contentPlannerAgent.js'
+
+export const CaptionOutputSchema = z.object({
+    caption: z.string().min(10).max(2200),
+    hashtags: z.array(z.string().startsWith('#')).min(5).max(30),
+    callToAction: z.string().describe('CTA yang subtle, bukan sales-y'),
+})
+
+export type CaptionOutput = z.infer<typeof CaptionOutputSchema>
+
+const SYSTEM_PROMPT = `
+    Kamu adalah Copywriter senior untuk "Nusantara Wear" — brand fashion lokal Indonesia.
+
+    Tone of voice:
+    - Hangat dan personal, seperti teman yang stylish
+    - Storytelling — setiap produk punya cerita pengrajin
+    - Bahasa Indonesia yang natural, tidak kaku
+    - Max 2 emoji per caption
+    - Jangan sales-y, jangan klaim berlebihan
+
+    Format caption: Hook kuat di kalimat pertama, lalu cerita, lalu CTA yang natural.
+`.trim()
+
+export async function runCaptionAgent(plan: ContentPlan): Promise<CaptionOutput> {
+    logger.info({ topic: plan.topic }, '✍️  Caption Agent starting')
+
+    const prompt = `
+        Tulis caption Instagram berdasarkan rencana konten ini:
+
+        Topik: ${plan.topic}
+        Angle: ${plan.angle}
+        Emosi yang dibangkitkan: ${plan.targetEmotion}
+        Content Pillar: ${plan.contentPillar}
+        Keywords: ${plan.keywords.join(', ')}
+
+        Caption harus:
+        - Hook kuat di kalimat pertama
+        - Ceritakan angle dengan natural
+        - Hashtags mix populer dan niche
+        - CTA yang subtle di akhir
+    `.trim()
+
+    if (!env.USE_LOCAL_LLM) {
+        const { output } = await generateText({
+            model: aiModel,
+            output: Output.object({ schema: CaptionOutputSchema }),
+            system: SYSTEM_PROMPT,
+            prompt,
+        })
+        logger.info('✍️  Caption Agent done')
+        return output
+    }
+
+    const { text } = await generateText({
+        model: aiModel,
+        system: SYSTEM_PROMPT,
+        prompt: prompt + `
+
+            Return ONLY valid JSON:
+            {
+                "caption": "teks caption lengkap",
+                "hashtags": ["#Hashtag1", "#Hashtag2", "#Hashtag3", "#Hashtag4", "#Hashtag5"],
+                "callToAction": "teks CTA"
+            }
+        `,
+    })
+
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const jsonStart = cleaned.indexOf('{')
+    if (jsonStart === -1) throw new Error('Caption Agent: No JSON in response')
+
+    const parsed = JSON.parse(cleaned.slice(jsonStart))
+    const result = CaptionOutputSchema.safeParse(parsed)
+    if (!result.success) throw new Error('Caption Agent: Invalid output structure')
+
+    logger.info('✍️  Caption Agent done')
+    return result.data
+}
