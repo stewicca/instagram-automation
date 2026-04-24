@@ -7,7 +7,7 @@ const EnvSchema = z.object({
     INSTAGRAM_BUSINESS_ACCOUNT_ID: z.string().min(1),
 
     // AI Model switching
-    USE_LOCAL_LLM: z.string().transform(v => v === 'true').default(false),
+    USE_LOCAL_LLM: z.string().default('false').transform(v => v === 'true'),
     ANTHROPIC_API_KEY: z.string().startsWith('sk-ant-'),
     CLAUDE_MODELS: z.enum([
         'claude-opus-4-6',
