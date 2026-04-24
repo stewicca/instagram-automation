@@ -6,13 +6,16 @@ const EnvSchema = z.object({
     INSTAGRAM_ACCESS_TOKEN: z.string().min(1),
     INSTAGRAM_BUSINESS_ACCOUNT_ID: z.string().min(1),
 
-    // AI
+    // AI Model switching
+    USE_LOCAL_LLM: z.string().transform(v => v === 'true').default(false),
     ANTHROPIC_API_KEY: z.string().startsWith('sk-ant-'),
     CLAUDE_MODELS: z.enum([
         'claude-opus-4-6',
         'claude-sonnet-4-6',
         'claude-haiku-4-5-20251001',
     ]).default('claude-sonnet-4-6'),
+    OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434/api'),
+    OLLAMA_MODEL: z.string().default('llama3.2'),
 
     // Database
     DATABASE_URL: z.string().url(),
