@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import {
     generate,
     CLAUDE_MODELS,
@@ -53,11 +52,11 @@ export async function reviseContent(
     }, 'Revising content based on feedback')
 
     const revisionPrompt = `
-Feedback dari brand owner: "${feedback}"
+				Feedback dari brand owner: "${feedback}"
 
-Revisi konten berdasarkan feedback tersebut.
-Pertahankan elemen yang tidak dikritik.
-Return ONLY valid JSON dengan struktur yang sama seperti sebelumnya.
+				Revisi konten berdasarkan feedback tersebut.
+				Pertahankan elemen yang tidak dikritik.
+				Return ONLY valid JSON dengan struktur yang sama seperti sebelumnya.
     `.trim()
 
     const raw = await generate({

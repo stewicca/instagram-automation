@@ -34,7 +34,7 @@ const getBrandVoice = tool({
 
 async function runReActDemo() {
     logger.info('🤖 Memulai ReAct Agent Demo...')
-  
+
     const result = await generateText({
         model: aiModel,
         tools: { searchTrendingFashion, getBrandVoice },
@@ -60,7 +60,7 @@ async function runReActDemo() {
             }
         },
     })
-  
+
     logger.info({ steps: result.steps.length }, '✅ Agent selesai! Total langkah ReAct')
     console.log('\n=== HASIL AKHIR ===\n')
     console.log(result.text)
