@@ -14,7 +14,7 @@ const EnvSchema = z.object({
         'claude-sonnet-4-6',
         'claude-haiku-4-5-20251001',
     ]).default('claude-sonnet-4-6'),
-    OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434/api'),
+    OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
     OLLAMA_MODEL: z.string().default('llama3.2'),
 
     // Database
