@@ -24,6 +24,12 @@ enum ContentPillar {
     BEHIND_THE_SCENES
 }
 
+enum AgentSessionStatus {
+    RUNNING
+    COMPLETED
+    FAILED
+}
+
 model ContentDraft {
     id              String          @id @default(cuid())
     status          ContentStatus   @default(PENDING_REVIEW)
@@ -52,33 +58,33 @@ model ContentDraft {
 }
 
 model PostAnalytics {
-    id              String          @id @default(cuid())
+    id              String              @id @default(cuid())
     
-    contentDraft    ContentDraft    @relation(fields: [contentDraftId], references: [id])
-    contentDraftId  String          @unique
+    contentDraft    ContentDraft        @relation(fields: [contentDraftId], references: [id])
+    contentDraftId  String              @unique
     
     instagramPostId String
     
-    reach           Int             @default(0)
-    impressions     Int             @default(0)
-    likes           Int             @default(0)
-    comments        Int             @default(0)
-    saves           Int             @default(0)
-    shares          Int             @default(0)
-    engagementRate  Float           @default(0)
+    reach           Int                 @default(0)
+    impressions     Int                 @default(0)
+    likes           Int                 @default(0)
+    comments        Int                 @default(0)
+    saves           Int                 @default(0)
+    shares          Int                 @default(0)
+    engagementRate  Float               @default(0)
     
-    boosted         Boolean         @default(false)
+    boosted         Boolean             @default(false)
     adsCampaignId   String?
     
-    fetchedAt       DateTime        @default(now())
-    updatedAt       DateTime        @updatedAt
+    fetchedAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt
     
     @@index([instagramPostId])
     @@index([engagementRate])
 }
 
 model RejectionFeedback {
-    id              String          @id @default(cuid())
+    id              String              @id @default(cuid())
     
     contentDraftId  String
     
@@ -86,15 +92,15 @@ model RejectionFeedback {
     imagePrompt     String
     feedback        String
     
-    usedAsExample   Boolean         @default(false)
+    usedAsExample   Boolean             @default(false)
     
-    createdAt       DateTime        @default(now())
+    createdAt       DateTime            @default(now())
     
     @@index([usedAsExample])
 }
 
 model JobLog {
-    id              String          @id @default(cuid())
+    id              String              @id @default(cuid())
     jobName         String
     jobId           String
     status          String
@@ -103,9 +109,28 @@ model JobLog {
     error           String?
     duration        Int?
     
-    createdAt       DateTime        @default(now())
+    createdAt       DateTime            @default(now())
     
     @@index([jobName])
     @@index([status])
     @@index([createdAt])
+}
+
+model AgentSession {
+    id              String              @id @default(cuid())
+    agentName       String
+    jobId           String?
+    
+    workingMemory   Json
+    
+    status          AgentSessionStatus  @default(RUNNING)
+    startedAt       DateTime            @default(now())
+    completedAt     DateTime?
+    errorMessage    String?
+    
+    contentDraftId  String?
+    
+    @@index([agentName, status])
+    @@index([jobId])
+    @@index([startedAt])
 }
