@@ -28,6 +28,12 @@ export type FetchAnalyticsPayload = {
 
 export type RunAdsCheckPayload = Record<string, never>
 
+export type GenerateImagePayload = {
+    contentDraftId: string
+    imagePrompt: string
+    format?: 'square' | 'portrait' | 'landscape'
+}
+
 const defaultJobOptions = {
     attempts: 3,
     backoff: {
@@ -47,6 +53,7 @@ function createQueue<T>(name: string) {
 
 export const queues = {
     generateContent: createQueue<GenerateContentPayload>('generateContent'),
+    generateImage: createQueue<GenerateImagePayload>('generateImage'),
     publishPost: createQueue<PublishPostPayload>('publishPost'),
     fetchAnalytics: createQueue<FetchAnalyticsPayload>('fetchAnalytics'),
     runAdsCheck: createQueue<RunAdsCheckPayload>('runAdsCheck'),
