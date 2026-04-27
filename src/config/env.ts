@@ -15,7 +15,8 @@ const EnvSchema = z.object({
         'claude-haiku-4-5-20251001',
     ]).default('claude-sonnet-4-6'),
     OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
-    OLLAMA_MODEL: z.string().default('llama3.2'),
+    OLLAMA_MODEL: z.string().default('qwen3.5:9b'),
+    OLLAMA_EMBED_MODEL: z.string().default('nomic-embed-text:v1.5'),
 
     // Database
     DATABASE_URL: z.string().url(),
@@ -29,6 +30,29 @@ const EnvSchema = z.object({
 
     // Telegram Bot - Optional - required only in production
     TELEGRAM_BOT_TOKEN: z.string().optional(),
+    // Chat ID pemilik akun — dapatkan dari @userinfobot di Telegram
+    TELEGRAM_CHAT_ID: z.string().optional(),
+
+    // Gemini API - Image Generation (Fase 6)
+    GEMINI_API_KEY: z.string().optional(),
+
+    // Cloud Storage (Fase 6) - 'local' untuk dev, 'r2' atau 's3' untuk production
+    UPLOAD_STORAGE: z.enum(['local', 'r2', 's3']).default('local'),
+    LOCAL_UPLOAD_PATH: z.string().default('./uploads'),
+    UPLOAD_BASE_URL: z.string().url().optional(), // public base URL untuk akses gambar
+
+    // Meta Ads API (Fase 7) - Optional, hanya dibutuhkan untuk ads automation
+    META_ADS_ACCOUNT_ID: z.string().optional(), // format: act_XXXXXX
+    META_ADS_ACCESS_TOKEN: z.string().optional(),
+
+    // HTTP Server (Fase 8)
+    PORT: z.coerce.number().default(3000),
+
+    // Langfuse - Observability (optional)
+    // Daftar gratis di: https://cloud.langfuse.com
+    LANGFUSE_PUBLIC_KEY: z.string().startsWith('pk-lf-').optional(),
+    LANGFUSE_SECRET_KEY: z.string().startsWith('sk-lf-').optional(),
+    LANGFUSE_BASE_URL: z.string().url().default('https://cloud.langfuse.com'),
 })
 
 const parsed = EnvSchema.safeParse(process.env)

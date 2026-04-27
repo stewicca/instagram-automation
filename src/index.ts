@@ -3,7 +3,12 @@ import { redisConnection, queues } from './lib/queue.js'
 import { db } from './lib/db.js'
 import { createGenerateContentWorker } from './jobs/generateContent.job.js'
 import { createPublishPostWorker } from './jobs/publishPost.job.js'
+import { createFetchAnalyticsWorker } from './jobs/fetchAnalytics.job.js'
+import { createGenerateImageWorker } from './jobs/generateImage.job.js'
+import { createRunAdsCheckWorker } from './jobs/runAdsCheck.job.js'
 import { setupScheduledJobs } from './jobs/scheduler.js'
+import { flushLangfuse } from './lib/langfuse.js'
+import { createServer } from './server/index.js'
 
 async function main() {
     logger.info('Instagram Automation — starting up')
@@ -11,9 +16,15 @@ async function main() {
     const workers = [
         createGenerateContentWorker(),
         createPublishPostWorker(),
+        createFetchAnalyticsWorker(),
+        createGenerateImageWorker(),
+        createRunAdsCheckWorker(),
     ]
 
     await setupScheduledJobs()
+
+    const server = createServer()
+    server.start()
 
     logger.info(`${workers.length} workers started, system is running`)
 
@@ -24,6 +35,8 @@ async function main() {
         isShuttingDown = true
 
         logger.info({ signal }, 'Shutdown signal received — draining workers')
+
+        await server.stop()
 
         await Promise.all(workers.map((w) => w.close()))
         logger.info('All workers drained')
@@ -36,6 +49,9 @@ async function main() {
 
         await db.$disconnect()
         logger.info('Database connection closed')
+
+        await flushLangfuse()
+        logger.info('Langfuse flushed')
 
         logger.info('Shutdown complete')
         process.exit(0)
