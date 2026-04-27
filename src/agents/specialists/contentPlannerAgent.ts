@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { aiModel } from '../../config/aiModel.js'
 import { logger } from '../../lib/logger.js'
 import { env } from '../../config/env.js'
+import type { LangfuseParent } from '../../lib/langfuse.js'
 
 const CONTENT_PILLAR_ALIASES: Record<string, ContentPlan['contentPillar']> = {
     educational: 'educational',
@@ -113,12 +114,22 @@ const SYSTEM_PROMPT = `
     Target audience: profesional urban Indonesia, 25-38 tahun.
 `.trim()
 
-export async function runContentPlannerAgent(request: {
-    topic: string
-    productType: string
-    currentMoment?: string
-}): Promise<ContentPlan> {
+export async function runContentPlannerAgent(
+    request: {
+        topic: string
+        productType: string
+        currentMoment?: string
+    },
+    // Parent Langfuse observation — diisi dari orchestrator, null jika Langfuse tidak aktif
+    parent?: LangfuseParent | null
+): Promise<ContentPlan> {
     logger.info({ topic: request.topic }, '🗓️  Content Planner Agent starting')
+
+    // Buat span di bawah parent trace/span untuk melacak agent ini di Langfuse
+    const span = parent?.span({
+        name: 'content-planner-agent',
+        input: request,
+    }) ?? null
 
     const prompt = `
         Rencanakan strategi konten Instagram untuk:
@@ -129,45 +140,76 @@ export async function runContentPlannerAgent(request: {
         Buat rencana yang spesifik dan actionable.
     `.trim()
 
-    if (!env.USE_LOCAL_LLM) {
-        const { output } = await generateText({
+    try {
+        if (!env.USE_LOCAL_LLM) {
+            const { output, usage } = await generateText({
+                model: aiModel,
+                output: Output.object({ schema: ContentPlanSchema }),
+                system: SYSTEM_PROMPT,
+                prompt,
+            })
+
+            // Catat LLM call di Langfuse: model, tokens, input/output
+            span?.generation({
+                name: 'content-plan-generation',
+                model: env.CLAUDE_MODELS,
+                input: { system: SYSTEM_PROMPT, prompt },
+                output,
+                usage: {
+                    input: usage?.inputTokens ?? 0,
+                    output: usage?.outputTokens ?? 0,
+                },
+            }).end()
+
+            span?.end({ output })
+            logger.info({ contentPillar: output.contentPillar }, '🗓️  Content Planner Agent done')
+            return output
+        }
+
+        const { text, usage } = await generateText({
             model: aiModel,
-            output: Output.object({ schema: ContentPlanSchema }),
             system: SYSTEM_PROMPT,
-            prompt,
+            prompt: prompt + `
+
+            		Return ONLY valid JSON:
+                {
+                    "topic": "topik spesifik",
+                    "angle": "sudut pandang unik",
+                    "targetEmotion": "emosi yang dibangkitkan",
+                    "contentPillar": "lifestyle",
+                    "suggestedPostTime": "Selasa 19:00 WIB",
+                    "keywords": ["kata1", "kata2", "kata3"]
+                }
+            `,
         })
-        logger.info({ contentPillar: output.contentPillar }, '🗓️  Content Planner Agent done')
-        return output
+
+        const parsed = parseJsonObjectFromText(text)
+        const normalized = normalizePlanOutput(parsed)
+        const result = ContentPlanSchema.safeParse(normalized)
+        if (!result.success) {
+            logger.error(
+                { error: result.error.flatten(), responseText: text },
+                'Content Planner returned invalid output structure'
+            )
+            throw new Error('Content Planner: Invalid output structure')
+        }
+
+        span?.generation({
+            name: 'content-plan-generation',
+            model: env.OLLAMA_MODEL,
+            input: { system: SYSTEM_PROMPT, prompt },
+            output: result.data,
+            usage: {
+                input: usage?.inputTokens ?? 0,
+                output: usage?.outputTokens ?? 0,
+            },
+        }).end()
+
+        span?.end({ output: result.data })
+        logger.info({ contentPillar: result.data.contentPillar }, '🗓️  Content Planner Agent done')
+        return result.data
+    } catch (error) {
+        span?.end({ output: { error: error instanceof Error ? error.message : 'unknown' } })
+        throw error
     }
-
-    const { text } = await generateText({
-        model: aiModel,
-        system: SYSTEM_PROMPT,
-        prompt: prompt + `
-
-        		Return ONLY valid JSON:
-            {
-                "topic": "topik spesifik",
-                "angle": "sudut pandang unik",
-                "targetEmotion": "emosi yang dibangkitkan",
-                "contentPillar": "lifestyle",
-                "suggestedPostTime": "Selasa 19:00 WIB",
-                "keywords": ["kata1", "kata2", "kata3"]
-            }
-        `,
-    })
-
-    const parsed = parseJsonObjectFromText(text)
-    const normalized = normalizePlanOutput(parsed)
-    const result = ContentPlanSchema.safeParse(normalized)
-    if (!result.success) {
-        logger.error(
-            { error: result.error.flatten(), responseText: text },
-            'Content Planner returned invalid output structure'
-        )
-        throw new Error('Content Planner: Invalid output structure')
-    }
-
-    logger.info({ contentPillar: result.data.contentPillar }, '🗓️  Content Planner Agent done')
-    return result.data
 }
