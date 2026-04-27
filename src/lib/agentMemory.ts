@@ -1,10 +1,12 @@
 import { db } from './db.js'
 import { logger } from './logger.js'
+import type { Prisma } from '../generated/prisma/client.js'
 
 export interface WorkingMemory {
-	  stepResults: StepResult[]
+	  [key: string]: Prisma.JsonValue
+	  stepResults: StoredStepResult[]
 	  decisions: Decision[]
-	  contextAccumulated: Record<string, unknown>
+	  contextAccumulated: Record<string, Prisma.JsonValue>
 }
 
 export interface StepResult {
@@ -15,6 +17,7 @@ export interface StepResult {
 }
 
 export interface Decision {
+	  [key: string]: Prisma.JsonValue
 	  reasoning: string
 	  decided: string
 	  timestamp: string
@@ -32,19 +35,29 @@ export interface AgentMemoryHandle {
 	  fail(error: string): Promise<void>
 }
 
+interface StoredStepResult {
+	  [key: string]: Prisma.JsonValue
+	  toolName: string
+	  input: Prisma.JsonValue
+	  output: Prisma.JsonValue
+	  timestamp: string
+}
+
 export async function createAgentSession(
 	  agentName: string,
 	  jobId?: string
 ): Promise<AgentMemoryHandle> {
+	  const initialMemory: WorkingMemory = {
+		    stepResults: [],
+		    decisions: [],
+		    contextAccumulated: {},
+	  }
+
 	  const session = await db.agentSession.create({
 		    data: {
 			      agentName,
-			      jobId,
-			      workingMemory: {
-				        stepResults: [],
-				        decisions: [],
-				        contextAccumulated: {},
-			      } satisfies WorkingMemory,
+			      jobId: jobId ?? null,
+			      workingMemory: initialMemory,
 		    },
 	  })
 
@@ -72,12 +85,16 @@ function buildHandle(sessionId: string, agentName: string): AgentMemoryHandle {
 		    agentName,
 
 		    async remember(key, value) {
+			      if (!isJsonValue(value)) {
+				        throw new TypeError(`remember("${key}") only accepts JSON-serializable values`)
+			      }
+
 			      const session = await db.agentSession.findUniqueOrThrow({
 				        where: { id: sessionId },
 				        select: { workingMemory: true },
 			      })
 
-			      const mem = session.workingMemory as WorkingMemory
+			      const mem = asWorkingMemory(session.workingMemory)
 			      const updated: WorkingMemory = {
 				        ...mem,
 				        contextAccumulated: {
@@ -98,20 +115,30 @@ function buildHandle(sessionId: string, agentName: string): AgentMemoryHandle {
 				        select: { workingMemory: true },
 			      })
 
-			      const mem = session.workingMemory as WorkingMemory
+			      const mem = asWorkingMemory(session.workingMemory)
 			      return mem.contextAccumulated[key] ?? null
 		    },
 
 		    async addStepResult(result) {
+			      if (!isJsonValue(result.input) || !isJsonValue(result.output)) {
+				        throw new TypeError('addStepResult only accepts JSON-serializable input/output')
+			      }
+
+			      const stored: StoredStepResult = {
+				        ...result,
+				        input: result.input,
+				        output: result.output,
+			      }
+
 			      const session = await db.agentSession.findUniqueOrThrow({
 				        where: { id: sessionId },
 				        select: { workingMemory: true },
 			      })
 
-			      const mem = session.workingMemory as WorkingMemory
+			      const mem = asWorkingMemory(session.workingMemory)
 			      const updated: WorkingMemory = {
 				        ...mem,
-				        stepResults: [...mem.stepResults, result],
+				        stepResults: [...mem.stepResults, stored],
 			      }
 
 			      await db.agentSession.update({
@@ -126,7 +153,7 @@ function buildHandle(sessionId: string, agentName: string): AgentMemoryHandle {
 				        select: { workingMemory: true },
 			      })
 
-			      const mem = session.workingMemory as WorkingMemory
+			      const mem = asWorkingMemory(session.workingMemory)
 			      const updated: WorkingMemory = {
 				        ...mem,
 				        decisions: [...mem.decisions, decision],
@@ -143,7 +170,7 @@ function buildHandle(sessionId: string, agentName: string): AgentMemoryHandle {
 				        where: { id: sessionId },
 				        select: { workingMemory: true },
 			      })
-			      return session.workingMemory as WorkingMemory
+			      return asWorkingMemory(session.workingMemory)
 		    },
 
 		    async complete(contentDraftId) {
@@ -170,4 +197,62 @@ function buildHandle(sessionId: string, agentName: string): AgentMemoryHandle {
 			      logger.warn({ sessionId, agentName, errorMessage }, '🧠 Agent session failed')
 		    },
 	  }
+}
+
+function asWorkingMemory(value: Prisma.JsonValue): WorkingMemory {
+	  if (!isWorkingMemory(value)) {
+		    throw new TypeError('Agent session workingMemory has invalid shape')
+	  }
+	  return value
+}
+
+function isWorkingMemory(value: Prisma.JsonValue): value is WorkingMemory {
+	  if (!isJsonObject(value)) return false
+	  if (!Array.isArray(value.stepResults) || !value.stepResults.every(isStepResult)) return false
+	  if (!Array.isArray(value.decisions) || !value.decisions.every(isDecision)) return false
+	  return value.contextAccumulated !== undefined && isJsonObject(value.contextAccumulated)
+}
+
+function isStepResult(value: Prisma.JsonValue): value is StoredStepResult {
+	  if (!isJsonObject(value)) return false
+	  return (
+		    typeof value.toolName === 'string' &&
+		    typeof value.timestamp === 'string' &&
+		    isJsonValue(value.input) &&
+		    isJsonValue(value.output)
+	  )
+}
+
+function isDecision(value: Prisma.JsonValue): value is Decision {
+	  if (!isJsonObject(value)) return false
+	  return (
+		    typeof value.reasoning === 'string' &&
+		    typeof value.decided === 'string' &&
+		    typeof value.timestamp === 'string'
+	  )
+}
+
+function isJsonObject(value: Prisma.JsonValue): value is Prisma.JsonObject {
+	  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isJsonValue(value: unknown): value is Prisma.JsonValue {
+	  if (
+		    value === null ||
+		    typeof value === 'string' ||
+		    typeof value === 'number' ||
+		    typeof value === 'boolean'
+	  ) {
+		    return true
+	  }
+
+	  if (Array.isArray(value)) {
+		    return value.every(isJsonValue)
+	  }
+
+	  if (typeof value === 'object') {
+		    return Object.values(value as Record<string, unknown>).every(isJsonValue)
+	  }
+
+	  return false
 }
