@@ -3,6 +3,8 @@ export interface RetryOptions {
     baseDelayMs?: number
     timeoutMs?: number
     shouldRetry?: (error: unknown) => boolean
+    // Dipanggil sebelum setiap retry — berguna untuk logging dan observability
+    onRetry?: (attempt: number, error: unknown) => void
 }
 
 function isRetryableError(error: unknown): boolean {
@@ -19,6 +21,7 @@ export async function withRetry<T>(
         maxAttempts = 3,
         baseDelayMs = 1000,
         shouldRetry = isRetryableError,
+        onRetry,
     }: RetryOptions = {}
 ): Promise<T> {
     let lastError: unknown
@@ -29,6 +32,8 @@ export async function withRetry<T>(
         } catch (error) {
             lastError = error
             if (attempt === maxAttempts || !shouldRetry(error)) throw error
+
+            onRetry?.(attempt, error)
 
             const delay = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 200
             await new Promise(resolve => setTimeout(resolve, delay))
